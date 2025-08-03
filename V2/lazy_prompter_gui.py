@@ -4,58 +4,28 @@ import pyautogui
 import threading
 import time
 
-# 🧠 Your Prompt Location (Set this once)
-PROMPT_X = 4348  # Replace with your own X
-PROMPT_Y = 1183  # Replace with your own Y
+# Initial dummy values (will be updated by user)
+PROMPT_POSITION = [4348, 1183]
 
-# 📋 All available prompts
 ALL_PROMPTS = [
-    "Continue",
-    "Proceed",
-    "Read all the files and report what’s happening",
-    "Fix the errors",
-    "Test the program",
-    "Regenerate the last response",
-    "Improve this code and explain changes",
-    "Refactor this for modularity and readability",
-    "Make the UI cleaner and more usable",
-    "Review all code files and dependencies",
-    "Build a simple dashboard for this project",
-    "Add basic logging to track what’s happening",
-    "Explain this step by step",
-    "Turn this into a Python script",
-    "Write a README for this project",
-    "Create a basic API using FastAPI"
+    "Continue", "Proceed", "Read all the files and report what’s happening",
+    "Fix the errors", "Test the program", "Regenerate the last response",
+    "Improve this code and explain changes", "Refactor for modularity",
+    "Review all code files", "Build a dashboard", "Add logging",
+    "Explain step by step", "Turn into Python script", "Write a README",
+    "Create an API using FastAPI"
 ]
 
-# 📦 Stores the 3 most recently used prompts
 recent_prompts = []
 
-# 🧠 Function to type prompt text at the given location
 def send_prompt(text):
     def do_type():
-        pyautogui.click(PROMPT_X, PROMPT_Y)
+        pyautogui.click(PROMPT_POSITION[0], PROMPT_POSITION[1])
         time.sleep(0.2)
         pyautogui.write(text, interval=0.01)
         pyautogui.press('enter')
     threading.Thread(target=do_type).start()
 
-# 🔁 Update recent prompt buttons
-def update_recent_buttons():
-    for i in range(3):
-        if i < len(recent_prompts):
-            recent_buttons[i].config(text=recent_prompts[i], state=tk.NORMAL)
-        else:
-            recent_buttons[i].config(text="", state=tk.DISABLED)
-
-# 🎯 On recent prompt click
-def on_recent_click(index):
-    text = recent_buttons[index]['text']
-    if text:
-        update_prompt_history(text)
-        send_prompt(text)
-
-# ➕ Update prompt history and reorder
 def update_prompt_history(prompt):
     if prompt in recent_prompts:
         recent_prompts.remove(prompt)
@@ -64,42 +34,91 @@ def update_prompt_history(prompt):
         recent_prompts.pop()
     update_recent_buttons()
 
-# 🔘 On dropdown run button
+def update_recent_buttons():
+    for i in range(3):
+        if i < len(recent_prompts):
+            btn_text = recent_prompts[i]
+            recent_buttons[i].config(text=btn_text, state=tk.NORMAL)
+        else:
+            recent_buttons[i].config(text="(empty)", state=tk.DISABLED)
+
+def on_recent_click(index):
+    text = recent_buttons[index]['text']
+    if text and text != "(empty)":
+        update_prompt_history(text)
+        send_prompt(text)
+        preview_var.set(f"Sent: {text}")
+
 def on_run_dropdown():
     text = prompt_var.get()
     if text:
         update_prompt_history(text)
         send_prompt(text)
+        preview_var.set(f"Sent: {text}")
 
-# 🪟 UI Setup
+# Cursor position setting logic
+def set_cursor_position():
+    def wait_for_click():
+        preview_var.set("Move your mouse to the prompt box and left-click...")
+        time.sleep(1)
+        while True:
+            if pyautogui.mouseDown():
+                x, y = pyautogui.position()
+                PROMPT_POSITION[0] = x
+                PROMPT_POSITION[1] = y
+                pos_label.config(text=f"🧭 Prompt Pos: ({x}, {y})")
+                preview_var.set("✅ Position set!")
+                break
+    threading.Thread(target=wait_for_click).start()
+
+# ==== GUI Setup ====
 root = tk.Tk()
-root.title("Lazy Prompter")
-root.attributes('-topmost', True)
-root.geometry("350x250")
+root.title("🧠 Lazy Prompter")
+root.geometry("430x360")
 root.resizable(False, False)
+root.attributes('-topmost', True)
 
-frame = tk.Frame(root, padx=10, pady=10)
+# Style
+style = ttk.Style(root)
+style.theme_use("clam")
+style.configure("TButton", font=("Segoe UI", 10), padding=5)
+style.configure("TCombobox", padding=5)
+style.configure("TLabel", font=("Segoe UI", 9), background="#1e1e1e", foreground="#ffffff")
+style.configure("TFrame", background="#1e1e1e")
+
+frame = ttk.Frame(root, padding=10)
 frame.pack(fill=tk.BOTH, expand=True)
 
-tk.Label(frame, text="🔁 Recent:").pack(anchor="w")
+ttk.Label(frame, text="Recent Prompts:").pack(anchor="w")
 
 recent_buttons = []
 for i in range(3):
-    btn = tk.Button(frame, text="", width=40, command=lambda i=i: on_recent_click(i))
-    btn.pack(pady=2)
+    btn = ttk.Button(frame, text="(empty)", width=50, command=lambda i=i: on_recent_click(i))
+    btn.pack(pady=3)
     recent_buttons.append(btn)
 
-tk.Label(frame, text="🔽 All Prompts").pack(pady=(10, 2), anchor="w")
+ttk.Label(frame, text="Select from All Prompts:").pack(anchor="w", pady=(10, 3))
 prompt_var = tk.StringVar()
-dropdown = ttk.Combobox(frame, textvariable=prompt_var, values=ALL_PROMPTS, width=45)
+dropdown = ttk.Combobox(frame, textvariable=prompt_var, values=ALL_PROMPTS, width=48)
 dropdown.pack()
 
-run_btn = tk.Button(frame, text="Run Prompt", command=on_run_dropdown, width=40, bg="lightblue")
-run_btn.pack(pady=8)
+run_button = ttk.Button(frame, text="🚀 Run Selected Prompt", command=on_run_dropdown)
+run_button.pack(pady=10)
 
-# Start with 3 default recents
+preview_var = tk.StringVar(value="No prompt sent yet.")
+preview_label = ttk.Label(frame, textvariable=preview_var, foreground="lightgreen")
+preview_label.pack(pady=5)
+
+# Prompt Position Button
+ttk.Label(frame, text="Prompt Input Location:").pack(anchor="w", pady=(10, 0))
+pos_label = ttk.Label(frame, text=f"🧭 Prompt Pos: ({PROMPT_POSITION[0]}, {PROMPT_POSITION[1]})")
+pos_label.pack()
+
+pos_btn = ttk.Button(frame, text="🖱️ Set Prompt Position", command=set_cursor_position)
+pos_btn.pack(pady=5)
+
+# Initialize recents
 for default in ["Fix the errors", "Test the program", "Proceed"]:
     update_prompt_history(default)
 
-# Launch it!
 root.mainloop()
